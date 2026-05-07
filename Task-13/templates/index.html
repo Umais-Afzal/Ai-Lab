@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏠 House Price Predictor</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 900px;
+            width: 100%;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        h1 { text-align: center; color: #333; margin-bottom: 10px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        label {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input, select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: 0.2s;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #764ba2;
+            box-shadow: 0 0 0 2px rgba(118,75,162,0.2);
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 25px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.02);
+        }
+        .result {
+            margin-top: 25px;
+            background: #f0f0f0;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            color: #2c3e50;
+            transition: 0.3s;
+        }
+        .error {
+            background: #ffe0e0;
+            color: #c0392b;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🏠 House Price Predictor</h1>
+    <div class="subtitle">Enter house details – get an estimated price</div>
+    <div class="form-grid" id="form-grid"></div>
+    <button id="predictBtn">💰 Predict Price</button>
+    <div id="result" class="result">Waiting for prediction...</div>
+    <div class="footer">Powered by Linear Regression 🧠</div>
+</div>
+
+<script>
+    // Define all features exactly as they appear in your dataset (excluding 'price' and 'date')
+    const features = [
+        { name: "bedrooms", label: "🛏️ Bedrooms", type: "number", step: 1, default: 3 },
+        { name: "bathrooms", label: "🚿 Bathrooms", type: "number", step: 0.5, default: 2 },
+        { name: "sqft_living", label: "📐 Living Sqft", type: "number", step: 1, default: 1800 },
+        { name: "sqft_lot", label: "🌳 Lot Sqft", type: "number", step: 1, default: 5000 },
+        { name: "floors", label: "🏢 Floors", type: "number", step: 0.5, default: 1 },
+        { name: "waterfront", label: "💧 Waterfront (0/1)", type: "number", step: 1, default: 0 },
+        { name: "view", label: "👀 View (0-4)", type: "number", step: 1, default: 0 },
+        { name: "condition", label: "🔨 Condition (1-5)", type: "number", step: 1, default: 3 },
+        { name: "sqft_above", label: "📏 Above Ground Sqft", type: "number", step: 1, default: 1500 },
+        { name: "sqft_basement", label: "🏚️ Basement Sqft", type: "number", step: 1, default: 0 },
+        { name: "yr_built", label: "📅 Year Built", type: "number", step: 1, default: 2000 },
+        { name: "yr_renovated", label: "🔧 Year Renovated", type: "number", step: 1, default: 0 },
+        { name: "street", label: "🏠 Street", type: "text", default: "Main St" },
+        { name: "city", label: "🌆 City", type: "text", default: "Seattle" },
+        { name: "statezip", label: "📮 StateZip", type: "text", default: "WA 98133" },
+        { name: "country", label: "🌍 Country", type: "text", default: "USA" }
+    ];
+
+    // Build the form dynamically
+    const formGrid = document.getElementById('form-grid');
+    features.forEach(f => {
+        const div = document.createElement('div');
+        div.className = 'input-group';
+        div.innerHTML = `
+            <label>${f.label}</label>
+            <input type="${f.type}" id="${f.name}" name="${f.name}" 
+                   step="${f.step || 1}" value="${f.default}" 
+                   ${f.type === 'number' ? 'min="0"' : ''}>
+        `;
+        formGrid.appendChild(div);
+    });
+
+    // Prediction logic
+    document.getElementById('predictBtn').addEventListener('click', async () => {
+        const resultDiv = document.getElementById('result');
+        resultDiv.textContent = '⏳ Predicting...';
+        resultDiv.classList.remove('error');
+        
+        // Collect all input values
+        const inputData = {};
+        features.forEach(f => {
+            let val = document.getElementById(f.name).value;
+            if (f.type === 'number') {
+                val = parseFloat(val);
+                if (isNaN(val)) val = 0;
+            }
+            inputData[f.name] = val;
+        });
+        
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(inputData)
+            });
+            const data = await response.json();
+            if (data.error) {
+                resultDiv.textContent = '❌ ' + data.error;
+                resultDiv.classList.add('error');
+            } else {
+                resultDiv.innerHTML = `🏆 Estimated Price: <span style="color:#2ecc71;">$${data.predicted_price.toLocaleString()}</span>`;
+            }
+        } catch (err) {
+            resultDiv.textContent = '⚠️ Server error. Is Flask running?';
+            resultDiv.classList.add('error');
+        }
+    });
+</script>
+</body>
+</html>
